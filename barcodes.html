@@ -1,0 +1,367 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<!--  
+                                               
+ .oooo.o oo.ooooo.   .oooo.    .ooooo.   .ooooo.  
+d88(      888' `88b `P  )88b  d88' `"Y8 d88   88b 
+`"Y88b.   888   888  .oP"888  888       888ooo888 
+o   )88b  888   888 d8(  888  888   .o8 888       
+8""888P'  888bod8P' `Y888""8o `Y8bod8P' `Y8bod8P  
+          888                                     
+         o888o                                    
+                                                  
+                              oooo         o8o                     
+                              `888                               
+ .ooooo.   .ooooo.   .ooooo.   888  oooo  oooo   .ooooo.   .oooo.o 
+d88' `"Y8 d88' `88b d88' `88b  888 .8P    `888  d88' `88b d88(  "8 
+888       888   888 888   888  888888.     888  888ooo888 `"Y88b.  
+888   .o8 888   888 888   888  888 `88b.   888  888    .o o.  )88b 
+`Y8bod8P' `Y8bod8P' `Y8bod8P' o888o o888o o888o `Y8bod8P' 8""888P' 
+                                                                             
+copyright (c) FRC Team 1868 Space Cookies 2006-2014
+
+@author chloe mo
+-->
+
+<head>
+    <meta charset="utf-8">
+     <title>barcode whatever</title>
+    
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    
+    <script>
+         Number.prototype.toHHMM = function () {
+            var min_num = parseInt(this, 10); // don't forget the second param
+            var hours   = Math.floor(min_num / 60);
+            var minutes = min_num - hours * 60;
+
+            if (hours   < 10) {
+                hours   = "0"+hours;
+            }
+            if (minutes < 10) {
+                minutes = "0"+minutes;
+            }
+            var time    = hours + ':' + minutes;
+            return time;
+        }                              
+        function createArray(text) {
+            var entries = text.split("\n"); // creates array with every element an entry (one scan)
+            
+            for(var i = 0; i < entries.length; i++) {
+               // remove lines that are comments
+                if(entries[i].charAt(0) === "#") {
+                    entries.splice(i, 1);
+                }
+            }
+            return entries;
+        };
+         function isSameDay(scan1, scan2) {
+            // using midnight for now. ideally maybe be called splitByDay(allscans) and . idk it's 2am right now.
+            if((scan1 == null) || (scan2 == null)) {
+                return false;
+            }
+            if(scan1.substring(0, 8) === scan2.substring(0, 8)) {
+                return true;
+            } else return false;
+        };
+        function isRedundant(scan1, scan2) { // in format mmddyyyyhhmmss
+            // 1344xx and 1346xx are redundant, so -200 <= 1346xx - 1344xx <= 200
+            if(isSameDay(scan1, scan2)) {
+                if(Math.abs(parseInt(scan1.substring(8, 14)) - parseInt(scan2.substring(8, 14))) <= 200) {
+                    return true;
+                } else return false;
+            } else return false;
+        };
+        function calcTime(allScans) {
+            // allScans is an array for a person, eg ppl[key] containing all the scans for a single person
+            // redundancies have been removed
+            if(allScans.length % 2 === 1) { // odd # of entries total!!! bad. flag.
+                // do something
+            } else {
+                // do something else
+            }
+            var totalTime = 0;
+            for(var i = 0; i < allScans.length - 1; i++) {
+                if((allScans[i] != null) && (allScans[i].charAt(0) !== "x") && isSameDay(allScans[i], allScans[i+1])) { // assuming allScans is already sorted by date
+                    var min1 = parseInt(allScans[i].substring(8,10)) * 60 + parseInt(allScans[i].substring(10,12));
+                    var min2 = parseInt(allScans[i + 1].substring(8,10)) * 60 + parseInt(allScans[i + 1].substring(10,12));
+                    totalTime = min2 - min1; // ffr: can assume if min2 < min1, min1 is on previous day
+                    allScans[i + 1] = "x" + allScans[i + 1]; // marks 2nd in pair so we know we've done that already
+                }
+            }
+            return totalTime;
+        };
+       
+        function getObjKeyIndex(obj, keyToFind) {
+            var i = 0, key;
+            for(key in obj) {
+                if (key === keyToFind) {
+                    return i;
+                }
+                i++;
+            }
+            return -1;
+        };
+        function allSameDay(scans, day) { // scans is just an array of ints for datetimes
+            // day is 8 chars eg 09092014
+            // returns scans that happened on certain day
+            var ret = [];
+            for(var i = 0; i < scans.length; i++) {
+                if(scans[i].substring(0,8) === day) {
+                    ret[i] = scans[i];
+                }
+            }
+            return ret;
+        };
+        function allDates(timecard) {
+            // returns array of all days anyone was in the lab
+            var ret = [];
+            for(var key in timecard) {
+                for(var day in timecard[key]) {
+                    if(ret.indexOf(day) < 0) {
+                        ret.push(day);
+                    }
+                }
+            }
+            return ret;
+        };
+        function timePerDate(person, timecard, ppl) { // each row of spreadsheet
+            // person is a key
+            var dates = allDates(timecard);
+            var ret = "";
+            for(var i = 0; i < dates.length; i++) {
+                if(getObjKeyIndex(timecard[person],dates[i]) < 0) { // if person wasnt in lab that day
+                    ret += 0 + ",";
+                } else if(allSameDay(ppl[person],dates[i]).length % 2 === 1) { // scans for this day
+                    ret += "!";
+                    ret += calcTime(allSameDay(ppl[person], dates[i])).toHHMM() + ","; // time for certain date
+                } else {
+                    ret += calcTime(allSameDay(ppl[person], dates[i])).toHHMM() + ","; // time for certain date
+                }
+            }
+            ret += calcTime(ppl[person]).toHHMM();
+            return ret;
+        };
+        
+        /*
+        L OMALLEY,101255,21:40:50,09/08/2014
+        C MO,101255,18:30:50,09/09/2014
+        C MO,101255,19:30:50,09/09/2014
+        C MO,101255,20:30:50,09/09/2014
+        
+        [1st initial last name, scanner id, hh:mm:ss, mm//dd/yyyy]
+        ppl = {
+            cmo : {
+                09092014183050,
+                090902014193050
+            } ,
+            lomalley : {
+                09082014214050
+            }
+        } ppl.cmo[1] is 09092014183050. date before time for easier sorting reasons
+        */
+        
+        // NOTE: end of the "day" should be 3 am aka 030000 but . that feature doesnt exist for now. sry </3
+        // ALSO NOTE: couldnt figure out how to efficiently add a flag for an odd # of entries
+        //              maybe adding a bunch of zeroes to the front would work? but for now odd # of entries are ignored
+        //              this will be fixed asap
+        
+        function barcodes() {
+            "use strict";
+            // get array of entries
+           
+            var entries = createArray($("#file").val());
+             // remove comments done by createArray()
+            // sort array by names
+            var ppl = {}; 
+            for(var i = 0; i < entries.length; i++) {
+                if(getObjKeyIndex(ppl, entries[i].split(",")[0]) < 0) { // if not already an element for that person in `ppl`
+                    ppl[entries[i].split(",")[0]] = []; // creates elements for each unique name
+                }
+            }
+            for(var i = 0; i < entries.length; i++) {
+                for(var key in ppl) {
+                    if (ppl.hasOwnProperty(key)) {
+                        if(key === entries[i].split(",")[0]) {
+                            ppl[key].push(entries[i].split(",")[3].replace(/\D/g,'') + entries[i].split(",")[2].replace(/\D/g,''));
+                        }
+                    }
+                }
+            }
+            // clean up array - remove entries within 2 minutes
+            for(var key in ppl) {
+                if (ppl.hasOwnProperty(key)) {
+                    for(var j = 0; j < ppl[key].length - 1; j++) {
+                        if(isRedundant(ppl[key][j], ppl[key][j+1])) {
+                            ppl[key].splice(j, 2);
+                        }
+                    }
+                }
+            }
+            var timecard = {};
+            // add timecard object
+            /*
+            timecard = {
+                cmo : {
+                    mmddyyyy : hhmm,
+                    date2 : totalTime2,
+                    date3: totalTime3
+                }
+                lomalley: {
+                    09092014: 0301 // this means 3 hrs 1 minute on sep 9 2014
+                }
+            } */
+            
+            // sort each person array by date - earliest first
+            for(var key in ppl) {
+                if (ppl.hasOwnProperty(key)) {
+                    ppl[key].sort(function(a, b){return parseInt(a) - parseInt(b)});
+                    timecard[key] = {}; // copies every key in ppl to timecard
+                    for(var i = 0; i < ppl[key].length; i++) {
+                        var date = ppl[key][i].substring(0, 8);
+                        if(timecard[key][date] == null) { // javascript's comparison operators make == better than === here
+                            timecard[key][date] = calcTime(allSameDay(ppl[key], date));
+                        }
+                    }
+                }
+            }
+            /* for(var key in timecard) { // add each date to each person
+                if (timecard.hasOwnProperty(key)) {
+                    for(var i = 0; i < ppl[key].length; i++) {
+                        var date = ppl[key][i].substring(0, 8);
+                        if(timecard[key][date] == null) { // javascript's copmarison operators make == better than === here
+                            timecard[key][date] = calcTime(allSameDay(ppl[key], date));
+                        }
+                    }
+                }
+            } */
+            // at this point timecard should look finished
+            // this is probably so wrong it's 3am and i havent checked anything
+            var ret = "name/date,";
+            var dates = allDates(timecard);
+            for(var i = 0; i < dates.length; i++) {
+                dates[i] = dates[i].substring(0,2) + "/" + dates[i].substring(2,4) + "/" + dates[i].substring(4,8);
+            }
+            ret += dates.join() + ",total\n";
+            for(var key in timecard) {
+                if (timecard.hasOwnProperty(key)) {
+                    ret += key + "," + timePerDate(key, timecard, ppl) + "\n";
+                }
+            }
+            $("#output").val(ret);
+        };
+    </script>
+    
+    <link href="http://fonts.googleapis.com/css?family=Roboto" rel="stylesheet" />
+    <style type="text/css">
+    /* css goes here */
+        * {margin:0;border:0;padding:0;}
+        html {
+            height:100%;
+        }
+        body {
+            background: -moz-linear-gradient(top, #FAE6F5 0%, #8edbfe   100%);
+            background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#FAE6F5), color-stop(100%,#8edbfe )); /* Chrome,Safari4+ */
+            background: -webkit-linear-gradient(top, #FAE6F5 0%,#8edbfe  100%); 
+            background: -o-linear-gradient(top, #FAE6F5 0%,#8edbfe  100%); 
+            background: -ms-linear-gradient(top, #FAE6F5 0%,#8edbfe  100%);
+            background-attachment:fixed;
+            font-family:'Roboto';
+            padding:0;	
+            color:#fff;
+            font-weight:300;
+            letter-spacing:0.2px;
+            word-spacing:0.5px;
+            overflow-y:hidden;
+        }
+        h1,h2 {
+            font-weight:300;
+            font-size:2.5em;
+        }
+        header {
+            background:rgba(255,255,255,255,0.2);
+            width:100%;
+            margin-top:0;
+        }
+	   header h2 {
+           padding:0.6em 0.8em 0.8em 0.8em;
+           cursor:pointer;
+           width:350px;
+           font-weight: 200;
+       }
+        a {color:#111;}
+        p {padding:10px 0 0 0;}
+        ul {padding-left:30px;padding-top:10px;}
+        li {padding:5px;}
+        button {
+            text-decoration:none;
+            padding:12px 24px;
+            margin:1.3em 0;
+            display:inline-block;
+            border:2px #fff solid;
+            font-size:1.6em;
+            color:#fff;
+            opacity:0.9;
+            background: transparent;
+        }
+        button:hover {
+            opacity:1;
+            background:rgba(255, 255, 255, 0.6);
+            -webkit-transition:all linear 150ms;
+        }
+        textarea {
+            padding:12px 12px;font-size:1.5em;
+            display:inline;
+            border:2px #fff solid;
+            background:none;
+            font-weight:300!important;
+            opacity:0.8;
+            color:#fff;
+            width:500px;
+            height:300px;
+        }
+        textarea:nth-child(odd) {
+            margin:30px 30px 0 0;
+        }
+        textarea:focus {
+            outline:none;
+            opacity:1;
+        }
+        
+        form {margin-top:15px;}
+        .con {
+            height:100%;
+            width: 700px;
+            margin-left:300px;
+            padding-bottom:50px;
+        }
+        
+        textarea {
+            outline: none;
+        }
+        
+    </style>
+</head>
+
+<body>
+    <header><h2>timecard</h2></header>
+    <div class = "con">
+        <center>
+            <button type="button" id="uploadFile">upload .txt or .csv</button>
+            <p></p>
+            <strong>or paste into here</strong>
+            <p></p>
+            <textarea rows="30" cols="50" id = "file"></textarea><p></p>
+            <button onclick="barcodes()">generate time spreadsheet</button> 
+            <p></p>
+            <textarea rows="30" cols="50" id = "output"></textarea>
+        </center>
+    </div>
+  
+
+    
+</body>
+    
+
+</html>
